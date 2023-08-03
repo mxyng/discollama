@@ -108,6 +108,11 @@ parser.add_argument('--buffer-size', default=32, type=int)
 args = parser.parse_args()
 
 args.redis.parent.mkdir(parents=True, exist_ok=True)
-redis = Redis(args.redis)
 
-client.run(os.getenv('DISCORD_TOKEN'))
+try:
+    redis = Redis(args.redis)
+    client.run(os.getenv('DISCORD_TOKEN'))
+except KeyboardInterrupt:
+    pass
+
+redis.close()
