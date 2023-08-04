@@ -76,7 +76,7 @@ async def on_message(message):
             await message.channel.send('What can I do for you?', reference=message)
             return
 
-        response = await message.channel.send(':thinking:', reference=message)
+        response = await message.reply(':thinking:')
 
         # TODO: discord has a 2000 character limit, so we need to split the response
         buffer = ''
