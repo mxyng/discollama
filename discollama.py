@@ -76,31 +76,31 @@ async def on_message(message):
             await message.channel.send('What can I do for you?', reference=message)
             return
 
-        await message.add_reaction('🤔')
-        response = None
-
         # TODO: discord has a 2000 character limit, so we need to split the response
+        response = None
         buffer = ''
         response_content = ''
-        async for chunk in generate_response(raw_content, **load_session(message.reference)):
-            if chunk['done']:
-                response_content += buffer
-                save_session(response, chunk)
-                break
+        async with message.channel.typing():
+            await message.add_reaction('🤔')
+            async for chunk in generate_response(raw_content, **load_session(message.reference)):
+                if chunk['done']:
+                    response_content += buffer
+                    save_session(response, chunk)
+                    break
 
-            buffer += chunk['response']
+                buffer += chunk['response']
 
-            if len(buffer) >= args.buffer_size:
-                # buffer the edit so as to not call Discord API too often
-                response_content += buffer
+                if len(buffer) >= args.buffer_size:
+                    # buffer the edit so as to not call Discord API too often
+                    response_content += buffer
 
-                if response:
-                    await response.edit(content=response_content + '...')
-                else:
-                    response = await message.reply(response_content)
-                    await message.remove_reaction('🤔', client.user)
+                    if response:
+                        await response.edit(content=response_content + '...')
+                    else:
+                        response = await message.reply(response_content)
+                        await message.remove_reaction('🤔', client.user)
 
-                buffer = ''
+                    buffer = ''
 
         await response.edit(content=response_content)
 
