@@ -8,7 +8,6 @@ from redislite import Redis
 from pathlib import Path
 
 import logging
-logging.basicConfig(level=logging.INFO)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -18,7 +17,12 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
-    logging.info('ready')
+    logging.info(
+        'Ready! Invite URL: %s',
+        discord.utils.oauth_url(
+            client.application_id,
+            permissions=discord.Permissions(read_messages=True, send_messages=True),
+            scopes=['bot']))
 
 
 async def generate_response(prompt, context=[]):
@@ -111,7 +115,7 @@ args.redis.parent.mkdir(parents=True, exist_ok=True)
 
 try:
     redis = Redis(args.redis)
-    client.run(os.getenv('DISCORD_TOKEN'))
+    client.run(os.getenv('DISCORD_TOKEN'), root_logger=True)
 except KeyboardInterrupt:
     pass
 
