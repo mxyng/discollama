@@ -76,7 +76,8 @@ async def on_message(message):
             await message.channel.send('What can I do for you?', reference=message)
             return
 
-        response = await message.reply(':thinking:')
+        await message.add_reaction('🤔')
+        response = None
 
         # TODO: discord has a 2000 character limit, so we need to split the response
         buffer = ''
@@ -92,7 +93,12 @@ async def on_message(message):
             if len(buffer) >= args.buffer_size:
                 # buffer the edit so as to not call Discord API too often
                 response_content += buffer
-                await response.edit(content=response_content + '...')
+
+                if response:
+                    await response.edit(content=response_content + '...')
+                else:
+                    response = await message.reply(response_content)
+                    await message.remove_reaction('🤔', client.user)
 
                 buffer = ''
 
