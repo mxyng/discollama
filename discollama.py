@@ -73,8 +73,7 @@ async def on_message(message):
     if client.user.id in message.raw_mentions:
         raw_content = message.content.replace(f'<@{client.user.id}>', '').strip()
         if raw_content.strip() == '':
-            await message.channel.send('What can I do for you?', reference=message)
-            return
+            raw_content = 'Tell me about yourself.'
 
         # TODO: discord has a 2000 character limit, so we need to split the response
         response = None
