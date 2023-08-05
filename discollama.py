@@ -88,7 +88,6 @@ async def on_message(message):
         if raw_content.strip() == '':
             raw_content = 'Tell me about yourself.'
 
-        # TODO: discord has a 2000 character limit, so we need to split the response
         response = None
         response_content = ''
         async with message.channel.typing():
@@ -100,11 +99,17 @@ async def on_message(message):
                     save_session(response, chunk)
                     break
 
-                if response:
-                    await response.edit(content=response_content + '...')
-                else:
+                if not response:
                     response = await message.reply(response_content)
                     await message.remove_reaction('🤔', client.user)
+                    continue
+
+                if len(response_content) + 3 >= 2000:
+                    response = await response.reply(buffer)
+                    response_content = buffer
+                    continue
+
+                await response.edit(content=response_content + '...')
 
         await response.edit(content=response_content)
 
