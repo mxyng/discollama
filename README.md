@@ -58,3 +58,7 @@ TEMPLATE """[INST] {{ if .First }}<<SYS>>{{ .System }}<</SYS>>
 ```
 
 This model replies with the sentiment of the the input prompt: positive, negative, or neutral.
+
+## Activating the Bot
+
+Discord users can interact with the bot by mentioning it in a message to start a new conversation or in a reply to a previous response to continue an ongoing conversation.
