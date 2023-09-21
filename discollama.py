@@ -93,7 +93,20 @@ async def on_message(message):
         async with message.channel.typing():
             await message.add_reaction('🤔')
 
-            async for buffer, chunk in buffered_generate_response(raw_content, **load_session(message.reference)):
+            context = []
+            if reference := message.reference:
+                if session := load_session(message.reference):
+                    context = session.get('context', [])
+
+                reference_message = await message.channel.fetch_message(reference.message_id)
+                reference_content = reference_message.content
+                raw_content = '\n'.join([
+                    raw_content,
+                    'Use it to answer the prompt:',
+                    reference_content,
+                ])
+
+            async for buffer, chunk in buffered_generate_response(raw_content, context=context):
                 response_content += buffer
                 if chunk['done']:
                     save_session(response, chunk)
