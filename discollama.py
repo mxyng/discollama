@@ -4,8 +4,7 @@ import aiohttp
 import msgpack
 import discord
 import argparse
-from redislite import Redis
-from pathlib import Path
+from redis import Redis
 
 import logging
 
@@ -138,22 +137,24 @@ async def on_message(message):
     await response.edit(content=response_content)
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--ollama-host', default='127.0.0.1')
-parser.add_argument('--ollama-port', default=11434, type=int)
-parser.add_argument('--ollama-model', default='llama2', type=str)
+default_ollama_host = os.getenv('OLLAMA_HOST', '127.0.0.1')
+default_ollama_port = os.getenv('OLLAMA_PORT', 11434)
+default_ollama_model = os.getenv('OLLAMA_MODEL', 'llama2')
 
-default_redis = Path.home() / '.cache' / 'discollama' / 'brain.db'
-parser.add_argument('--redis', default=default_redis, type=Path)
+parser = argparse.ArgumentParser()
+parser.add_argument('--ollama-host', default=default_ollama_host)
+parser.add_argument('--ollama-port', default=default_ollama_port, type=int)
+parser.add_argument('--ollama-model', default=default_ollama_model, type=str)
+
+parser.add_argument('--redis-host', default='localhost')
+parser.add_argument('--redis-port', default=6379)
 
 parser.add_argument('--buffer-size', default=32, type=int)
 
 args = parser.parse_args()
 
-args.redis.parent.mkdir(parents=True, exist_ok=True)
-
 try:
-  redis = Redis(args.redis)
+  redis = Redis(host=args.redis_host, port=args.redis_port)
   client.run(os.getenv('DISCORD_TOKEN'), root_logger=True)
 except KeyboardInterrupt:
   pass
