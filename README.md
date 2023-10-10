@@ -1,8 +1,10 @@
 # discollama
 
-`discollama` is a Discord bot powered by a local large language model backed by [Ollama](https://github.com/jmorganca/ollama) with memory backed by [Redislite](https://github.com/yahoo/redislite).
+`discollama` is a Discord bot powered by a local large language model backed by [Ollama](https://github.com/jmorganca/ollama).
 
 ## Dependencies
+
+- Redis
 
 ```
 python3 -m pip install poetry

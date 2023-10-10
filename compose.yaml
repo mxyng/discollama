@@ -1,0 +1,18 @@
+version: '3'
+services:
+  discollama:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    command: ['--redis-host', 'redis']
+    environment:
+      - DISCORD_TOKEN
+      - OLLAMA_HOST=host.docker.internal
+      - OLLAMA_PORT=11434
+      - OLLAMA_MODEL=discollama
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - 6379
