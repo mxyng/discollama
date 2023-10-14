@@ -45,6 +45,9 @@ async def generate_response(prompt, context=[]):
 async def buffered_generate_response(prompt, context=[]):
   buffer = ''
   async for part in generate_response(prompt, context):
+    if error := part.get('error'):
+      raise Exception(error)
+
     if part['done']:
       yield buffer, part
       break
