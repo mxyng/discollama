@@ -1,7 +1,6 @@
 import os
 import json
 import aiohttp
-import msgpack
 import discord
 import argparse
 from redis import Redis
@@ -45,34 +44,30 @@ async def generate_response(prompt, context=[]):
 
 async def buffered_generate_response(prompt, context=[]):
   buffer = ''
-  async for chunk in generate_response(prompt, context):
-    if chunk['done']:
-      yield buffer, chunk
+  async for part in generate_response(prompt, context):
+    if part['done']:
+      yield buffer, part
       break
 
-    buffer += chunk['response']
+    buffer += part['response']
     if len(buffer) >= args.buffer_size:
-      yield buffer, chunk
+      yield buffer, part
       buffer = ''
 
 
-def save_session(response, chunk):
-  context = msgpack.packb(chunk['context'])
-  redis.hset(f'ollama:{response.id}', 'context', context)
+def save_session(response, part):
+  context = part.get('context', [])
+  redis.json().set(f'ollama:{response.id}', '$', {'context': context})
 
   redis.expire(f'ollama:{response.id}', 60 * 60 * 24 * 7)
-  logging.info(
-    'saving message=%s: len(context)=%d',
-    response.id,
-    len(chunk['context']),
-  )
+  logging.info('saving message=%s: len(context)=%d', response.id, len(context))
 
 
 def load_session(reference):
   kwargs = {}
   if reference:
-    context = redis.hget(f'ollama:{reference.message_id}', 'context')
-    kwargs['context'] = msgpack.unpackb(context) if context else []
+    context = redis.json().get(f'ollama:{reference.message_id}', '.context')
+    kwargs['context'] = context or []
 
   if kwargs.get('context'):
     logging.info(
@@ -113,13 +108,13 @@ async def on_message(message):
             reference_content,
           ])
 
-      async for buffer, chunk in buffered_generate_response(
+      async for buffer, part in buffered_generate_response(
           raw_content,
           context=context,
       ):
         response_content += buffer
-        if chunk['done']:
-          save_session(response, chunk)
+        if part['done']:
+          save_session(response, part)
           break
 
         if not response:
