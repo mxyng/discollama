@@ -14,6 +14,7 @@ services:
 
   redis:
     image: redis/redis-stack-server:latest
+    restart: always
     volumes:
       - /data
     ports:
