@@ -4,62 +4,38 @@
 
 ## Dependencies
 
-- Redis
-
-```
-python3 -m pip install poetry
-poetry install
-```
+- Docker and Docker Compose
 
 ## Run `discollama.py`
 
 ```
-poetry run python discollama.py
+DISCORD_TOKEN=xxxxx docker compose up
 ```
 
-_Note: You must setup a [Discord Bot](https://discord.com/developers/applications) and set environment variable `DISCORD_TOKEN` before `discollama.py` can access Discord._
+> Note: You must setup a [Discord Bot](https://discord.com/developers/applications) and set environment variable `DISCORD_TOKEN` before `discollama.py` can access Discord.
 
-`discollama.py` requires an [Ollama](https://github.com/jmorganca/ollama) server. Follow the steps in the [Ollama](https://github.com/jmorganca/ollama) repository to setup Ollama.
+`discollama.py` requires an [Ollama](https://github.com/jmorganca/ollama) server. Follow the steps in [jmorganca/ollama](https://github.com/jmorganca/ollama) repository to setup Ollama.
 
-By default, it uses `127.0.0.1:11434` but this can be configured with command line parameters `--ollama-host` and `--ollama-port`.
+By default, it uses `127.0.0.1:11434` which can be overwritten with `OLLAMA_HOST`.
+
+> Note: Deploying this on Linux requires updating network configurations and `OLLAMA_HOST`.
 
 ## Customize `discollama.py`
 
-The default LLM is `llama2`. A custom personality can be added by changing the `SYSTEM` instruction in the Modelfile and running `ollama create`:
+The default LLM is `mike/discollama`. A custom personality can be added by changing the `SYSTEM` instruction in the Modelfile and running `ollama create`:
 
 ```
-ollama create discollama -f Modelfile
+ollama create mymodel -f Modelfile
 ```
 
-This is set in `discollama.py` through `--ollama-model`:
+This can be changed in `compose.yaml`:
 
 ```
-poetry run python discollama.py --ollama-model discollama
+environment:
+  - OLLAMA_MODEL=mymodel
 ```
 
-Additional LLM parameters can be set in the same Modelfile through `PARAMETER` instructions:
-
-```
-FROM llama2
-
-PARAMETER temperature 2
-PARAMETER stop [INST]
-PARAMETER stop [/INST]
-PARAMETER stop <<SYS>>
-PARAMETER stop <</SYS>>
-```
-
-If customizing the system prompt is not enough, you can configure the full prompt template:
-
-```
-FROM llama2
-
-TEMPLATE """[INST] {{ if .First }}<<SYS>>{{ .System }}<</SYS>>
-
-{{ end }} Tweet: 'I hate it when my phone battery dies.' [/INST] Sentiment: Negative </s><s>[INST] Tweet: 'My day has been 👍' [/INST] Sentiment: Positive </s><s> [INST] Tweet: 'This is the link to the article' [/INST] Sentiment: Neutral </s><s> [INST] Tweet: '{{ .Prompt }}' [/INST] Sentiment: """
-```
-
-This model replies with the sentiment of the the input prompt: positive, negative, or neutral.
+See [jmorganca/ollama](https://github.com/jmorganca/ollama/blob/main/docs/modelfile.md) for more details.
 
 ## Activating the Bot
 

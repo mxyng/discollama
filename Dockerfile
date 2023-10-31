@@ -1,4 +1,4 @@
-FROM python:3.11-alpine
+FROM python:3.11.6-alpine
 
 RUN apk add --no-cache build-base libffi-dev
 RUN pip install poetry
