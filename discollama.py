@@ -38,7 +38,8 @@ class Response:
     if self.channel.type == discord.ChannelType.text:
       self.channel = await self.channel.create_thread(name='Discollama Says', message=self.message, auto_archive_duration=60)
 
-    self.r = await self.channel.send(self.sb.getvalue())
+    if value := self.sb.getvalue():
+      self.r = await self.channel.send(value)
 
 
 class Discollama:
@@ -124,7 +125,7 @@ class Discollama:
     sb = io.StringIO()
 
     t = datetime.now()
-    async for part in await self.ollama.generate(model=self.model, prompt=content, context=context, stream=True):
+    async for part in await self.ollama.generate(model=self.model, prompt=content, context=context, keep_alive=-1, stream=True):
       sb.write(part['response'])
 
       if part['done'] or datetime.now() - t > timedelta(seconds=1):
@@ -171,7 +172,7 @@ def main():
   intents.message_content = True
 
   Discollama(
-    ollama.AsyncClient(base_url=f'{args.ollama_scheme}://{args.ollama_host}:{args.ollama_port}'),
+    ollama.AsyncClient(host=f'{args.ollama_scheme}://{args.ollama_host}:{args.ollama_port}'),
     discord.Client(intents=intents),
     redis.Redis(host=args.redis_host, port=args.redis_port, db=0, decode_responses=True),
     model=args.ollama_model,
