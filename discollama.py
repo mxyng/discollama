@@ -31,15 +31,18 @@ class Response:
 
     self.sb.write(s)
 
+    value = self.sb.getvalue().strip()
+    if not value:
+      return
+
     if self.r:
-      await self.r.edit(content=self.sb.getvalue() + end)
+      await self.r.edit(content=value + end)
       return
 
     if self.channel.type == discord.ChannelType.text:
       self.channel = await self.channel.create_thread(name='Discollama Says', message=self.message, auto_archive_duration=60)
 
-    if value := self.sb.getvalue():
-      self.r = await self.channel.send(value)
+    self.r = await self.channel.send(value)
 
 
 class Discollama:
