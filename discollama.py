@@ -152,7 +152,8 @@ class Discollama:
   def run(self, token):
     try:
       self.discord.run(token)
-    except Exception:
+    except Exception as e:
+      logging.exception("An error occurred while running the bot: %s", e)
       self.redis.close()
 
 
