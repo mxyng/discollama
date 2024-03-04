@@ -19,3 +19,14 @@ services:
       - /data
     ports:
       - 6379
+  
+  chroma:
+    image: ghcr.io/chroma-core/chroma:latest
+    volumes:
+      - index_data:/chroma/.chroma/index
+    ports:
+      - 8000:8000
+
+volumes:
+  index_data:
+    driver: local

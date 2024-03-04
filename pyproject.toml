@@ -10,6 +10,7 @@ python = "^3.11"
 discord-py = "^2.3.1"
 redis = "^5.0.1"
 ollama = "^0.1.0"
+chromadb = "^0.4.24"
 
 [build-system]
 requires = ["poetry-core"]
