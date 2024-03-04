@@ -6,6 +6,7 @@ import argparse
 from datetime import datetime, timedelta
 
 import ollama
+import chromadb
 import discord
 import redis
 
@@ -46,11 +47,12 @@ class Response:
 
 
 class Discollama:
-  def __init__(self, ollama, discord, redis, model):
+  def __init__(self, ollama, discord, redis, model, collection):
     self.ollama = ollama
     self.discord = discord
     self.redis = redis
     self.model = model
+    self.collection = collection
 
     # register event handlers
     self.discord.event(self.on_ready)
@@ -100,6 +102,29 @@ class Discollama:
             reference_message.content,
           ]
         )
+    
+    # retrieve relevant context from vector store
+    knowledge = self.collection.query(
+      query_texts=[content],
+      n_results=2
+    )
+    # directly unpack the first list of documents if it exists, or use an empty list
+    documents = knowledge.get('documents', [[]])[0]
+
+    content = '\n'.join(
+      [
+        'Using the provided document, answer the user question to the best of your ability. You must try to use information from the provided document. Combine information in the document into a coherent answer.',
+        'If there is nothing in the document relevant to the user question, say \'Hmm, I don\'t know about that, try referencing the docs.\', before providing any other information you know.',
+        'Anything between the following `document` html blocks is retrieved from a knowledge bank, not part of the conversation with the user.',
+        '<document>',
+        '\n'.join(documents) if documents else '',
+        '</document>',
+        'Anything between the following `user` html blocks is part of the conversation with the user.',
+        '<user>',
+        content,
+        '</user>',
+      ]
+    )
 
     if not context:
       context = await self.load(channel_id=channel.id)
@@ -157,6 +182,35 @@ class Discollama:
       self.redis.close()
 
 
+def embed_data(collection):
+  logging.info('embedding data...')
+  documents = []
+  ids = []
+  # read all data from the data folder
+  for filename in os.listdir('data'):
+    if filename.endswith('.json'):
+      filepath = os.path.join('data', filename)
+      with open(filepath, 'r') as file:
+        try:
+          data = json.load(file)
+          if isinstance(data, list):
+            for index, item in enumerate(data):
+              documents.append(item)
+              file_id = f"{filename.rsplit('.', 1)[0]}-{index}"
+              ids.append(file_id)
+          else:
+            logging.warning("The file {filename} is not a JSON array.")
+        except json.JSONDecodeError as e:
+          logging.exception(f"Error decoding JSON from file {filename}: {e}")
+        except Exception as e:
+          logging.exception(f"An error occurred while processing file {filename}: {e}")
+  # store the data in chroma for look-up
+  collection.add(
+    documents=documents,
+    ids=ids,
+  )
+
+
 def main():
   parser = argparse.ArgumentParser()
 
@@ -175,11 +229,16 @@ def main():
   intents = discord.Intents.default()
   intents.message_content = True
 
+  chroma = chromadb.Client()
+  collection = chroma.get_or_create_collection(name='discollama')
+  embed_data(collection)
+
   Discollama(
     ollama.AsyncClient(host=f'{args.ollama_scheme}://{args.ollama_host}:{args.ollama_port}'),
     discord.Client(intents=intents),
     redis.Redis(host=args.redis_host, port=args.redis_port, db=0, decode_responses=True),
     model=args.ollama_model,
+    collection=collection,
   ).run(os.environ['DISCORD_TOKEN'])
 
 
