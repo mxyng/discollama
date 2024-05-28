@@ -1,11 +1,21 @@
-FROM python:3.11.6-alpine
+FROM python:3.12.2-slim-bookworm
 
-RUN apk add --no-cache build-base libffi-dev
+# Install system dependencies required for Python packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install poetry
 
 WORKDIR /mnt
-COPY pyproject.toml poetry.lock .
+
+# Copy only the files needed for the poetry installation to avoid cache invalidation
+COPY pyproject.toml poetry.lock ./
+
 RUN poetry install --no-root --only main
 
+# Copy the application
 COPY . .
+
 ENTRYPOINT ["poetry", "run", "python", "discollama.py"]
