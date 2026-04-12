@@ -10,6 +10,7 @@ import discord
 import redis
 
 from logging import getLogger
+from ollama import Tool, WebSearchResponse, WebFetchResponse
 
 # piggy back on the logger discord.py set up
 logging = getLogger('discord.discollama')
@@ -46,11 +47,12 @@ class Response:
 
 
 class Discollama:
-  def __init__(self, ollama, discord, redis, model):
+  def __init__(self, ollama, discord, redis, model, enable_web_search=False):
     self.ollama = ollama
     self.discord = discord
     self.redis = redis
     self.model = model
+    self.enable_web_search = enable_web_search
 
     # register event handlers
     self.discord.event(self.on_ready)
@@ -101,18 +103,32 @@ class Discollama:
           ]
         )
 
+    # Get messages around
+    context_parts = []
+    async for msg in channel.history(limit=4, before=message):
+      context_parts.append(msg.content)
+
+    if context_parts:
+      content = '\n'.join(
+        [
+          content,
+          'Use this to answer the question if it is relevant, otherwise ignore it:',
+          *context_parts,
+        ]
+      )
+
     if not context:
       context = await self.load(channel_id=channel.id)
 
     r = Response(message)
     task = asyncio.create_task(self.thinking(message))
-    async for part in self.generate(content, context):
+    async for text in self.generate(content, context):
       task.cancel()
 
-      await r.write(part['response'], end='...')
+      await r.write(text, end='...')
 
     await r.write('')
-    await self.save(r.channel.id, message.id, part['context'])
+    await self.save(r.channel.id, message.id, [])
 
   async def thinking(self, message, timeout=999):
     try:
@@ -124,19 +140,73 @@ class Discollama:
     finally:
       await message.remove_reaction('🤔', self.discord.user)
 
+  def format_web_results(self, results, query):
+    output = []
+    if isinstance(results, WebSearchResponse):
+      output.append(f'Search results for "{query}":')
+      for result in results.results:
+        if result.title:
+          output.append(f'- {result.title}')
+        if result.url:
+          output.append(f'  URL: {result.url}')
+        if result.content:
+          output.append(f'  {result.content}')
+    elif isinstance(results, WebFetchResponse):
+      output.append(f'Fetched content from "{query}":')
+      if results.title:
+        output.append(f'Title: {results.title}')
+      if results.content:
+        output.append(f'Content: {results.content}')
+      if results.links:
+        output.append(f'Links: {", ".join(results.links)}')
+    return '\n'.join(output) if output else f'No results for "{query}"'
+
   async def generate(self, content, context):
+    messages = [{'role': 'user', 'content': content}]
+    tools = [Tool(function=Tool.Function(name='web_search', description='Search the web for current information, ALWAYS use this to find answers to questions'))] if self.enable_web_search else None
+
     sb = io.StringIO()
 
     t = datetime.now()
-    async for part in await self.ollama.generate(model=self.model, prompt=content, context=context, keep_alive=-1, stream=True):
-      sb.write(part['response'])
+    response = await self.ollama.chat(model=self.model, messages=messages, tools=tools, keep_alive=-1, stream=True)
 
-      if part['done'] or datetime.now() - t > timedelta(seconds=1):
-        part['response'] = sb.getvalue()
-        yield part
-        t = datetime.now()
-        sb.seek(0, io.SEEK_SET)
-        sb.truncate()
+    async for part in response:
+      if content := part.message.content:
+        sb.write(content)
+
+      if part.done or datetime.now() - t > timedelta(seconds=1):
+        if sb.getvalue():
+          yield sb.getvalue()
+          t = datetime.now()
+          sb.seek(0, io.SEEK_SET)
+          sb.truncate()
+
+      if tool_calls := part.message.tool_calls:
+        for tool_call in tool_calls:
+          func_name = tool_call.function.name
+          args = tool_call.function.arguments or {}
+
+          if func_name == 'web_search' and 'query' in args:
+            result = await self.ollama.web_search(args['query'])
+            formatted = self.format_web_results(result, args['query'])
+            messages.append({'role': 'tool', 'content': formatted})
+
+            async for text in self.generate(formatted, context):
+              yield text
+            return
+
+          elif func_name == 'web_fetch' and 'url' in args:
+            result = await self.ollama.web_fetch(args['url'])
+            formatted = self.format_web_results(result, args['url'])
+            messages.append({'role': 'tool', 'content': formatted})
+
+            async for text in self.generate(formatted, context):
+              yield text
+            return
+
+    # Yield any remaining content
+    if remaining := sb.getvalue():
+      yield remaining
 
   async def save(self, channel_id, message_id, ctx: list[int]):
     self.redis.set(f'discollama:channel:{channel_id}', message_id, ex=60 * 60 * 24 * 7)
@@ -159,23 +229,31 @@ class Discollama:
 def main():
   parser = argparse.ArgumentParser()
 
-  parser.add_argument('--ollama-model', default=os.getenv('OLLAMA_MODEL', 'llama2'), type=str)
+  parser.add_argument('--ollama-model', default=os.getenv('OLLAMA_MODEL', 'qwen3.5'), type=str)
 
   parser.add_argument('--redis-host', default=os.getenv('REDIS_HOST', '127.0.0.1'), type=str)
   parser.add_argument('--redis-port', default=os.getenv('REDIS_PORT', 6379), type=int)
 
   parser.add_argument('--buffer-size', default=32, type=int)
+  parser.add_argument('--web-search', action='store_true', help='Enable web search tool (requires OLLAMA_API_KEY env var)')
 
   args = parser.parse_args()
+
+  web_search = args.web_search or os.getenv('WEB_SEARCH', '').lower() in ('true', '1', 'yes')
 
   intents = discord.Intents.default()
   intents.message_content = True
 
+  ollama_kwargs = {}
+  if api_key := os.getenv('OLLAMA_API_KEY'):
+    ollama_kwargs['headers'] = {'Authorization': f'Bearer {api_key}'}
+
   Discollama(
-    ollama.AsyncClient(),
+    ollama.AsyncClient(**ollama_kwargs),
     discord.Client(intents=intents),
     redis.Redis(host=args.redis_host, port=args.redis_port, db=0, decode_responses=True),
     model=args.ollama_model,
+    enable_web_search=web_search,
   ).run(os.environ['DISCORD_TOKEN'])
 
 
