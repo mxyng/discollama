@@ -12,6 +12,8 @@
 DISCORD_TOKEN=xxxxx docker compose up
 ```
 
+WEB_SEARCH can be set to enable web search WEB_SEARCH=true.
+
 > [!NOTE]
 > You must setup a [Discord Bot](https://discord.com/developers/applications) and set environment variable `DISCORD_TOKEN` before `discollama.py` can access Discord.
 
@@ -19,11 +21,12 @@ DISCORD_TOKEN=xxxxx docker compose up
 
 By default, it uses `127.0.0.1:11434` which can be overwritten with `OLLAMA_HOST`.
 
+> Note: For use of Ollama Cloud, set `OLLAMA_HOST` to `https://ollama.com` and `OLLAMA_API_KEY` to your API key.
 > Note: Deploying this on Linux requires updating network configurations and `OLLAMA_HOST`.
 
 ## Customize `discollama.py`
 
-The default LLM is `mike/discollama`. A custom personality can be added by changing the `SYSTEM` instruction in the Modelfile and running `ollama create`:
+The default LLM is `qwen3.5`. A custom personality can be added by changing the `SYSTEM` instruction in the Modelfile and running `ollama create`:
 
 ```
 ollama create mymodel -f Modelfile
@@ -36,7 +39,7 @@ environment:
   - OLLAMA_MODEL=mymodel
 ```
 
-See [ollama/ollama](https://github.com/ollama/ollama/blob/main/docs/modelfile.md) for more details.
+See [ollama/ollama](https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx) for more details.
 
 ## Activating the Bot
 
